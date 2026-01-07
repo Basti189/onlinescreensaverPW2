@@ -48,6 +48,10 @@ set_wifi_state() {
 }
 
 remember_connectivity_state() {
+    if [ -n "$WIFI_STATE_BEFORE" ]; then
+        logger "Connectivity already remembered (wifi=$WIFI_STATE_BEFORE), skipping"
+        return
+    fi
     WIFI_STATE_BEFORE="$(get_wifi_state)"
     logger "Remembered connectivity: wifi=$WIFI_STATE_BEFORE"
 }
@@ -251,7 +255,13 @@ logger "Starting event-driven scheduler - waiting for powerd events"
 
 # Flush any leftover temp logs from previous session
 flush_temp_logs force
-lipc-wait-event -m com.lab126.powerd goingToScreenSaver,wakeupFromSuspend,readyToSuspend,outOfScreenSaver | while read event; do
+
+# IMPORTANT:
+# DO NOT add an RTC debounce.
+# This was tried before and completely broke wakeups.
+# Kindle powerd repeats readyToSuspend events on purpose.
+# Always set the RTC wakeup on every readyToSuspend.
+lipc-wait-event -m com.lab126.powerd goingToScreenSaver,wakeupFromSuspend,readyToSuspend,exitingScreenSaver  | while read event; do
     logger "Received event: $event"
     
     DEVICE_STATUS=$(lipc-get-prop com.lab126.powerd status)
@@ -268,22 +278,25 @@ lipc-wait-event -m com.lab126.powerd goingToScreenSaver,wakeupFromSuspend,readyT
             logger "Waking from suspend - waiting 2 seconds for system, then updating"
             sleep 2
             do_update_cycle
+            logger "Waking from suspend - Reset RTC"
 			set_wifi_state 0
             ;;
         readyToSuspend*)
             logger "Ready to suspend - setting RTC wakeup timer"
             NEXT_UPDATE_SECONDS=$(get_seconds_until_next_update)
             logger "Next update in $NEXT_UPDATE_SECONDS seconds"
-            set_rtc_wakeup_relative $NEXT_UPDATE_SECONDS
-			set_wifi_state 0
+            set_rtc_wakeup_relative "$NEXT_UPDATE_SECONDS"
+            set_wifi_state 0
             ;;
-		outOfScreenSaver*)
-			restore_connectivity_state_if_enabled
-			;;
+        exitingScreenSaver*)
+            restore_connectivity_state_if_enabled
+            logger "Exiting screensaver - clearing remembered WiFi state"
+            WIFI_STATE_BEFORE=""
+            logger "Exiting screensaver - Reset RTC"
+            ;;
         *)
             logger "Unknown event: $event"
             ;;
     esac
     
-
 done
