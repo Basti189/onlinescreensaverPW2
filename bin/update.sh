@@ -30,8 +30,8 @@ logger "WiFi connection state: $WIFI_CONNECTION"
 
 # Get battery status and build URL with parameters
 POWERD_OUTPUT=`/usr/bin/powerd_test -s`
-batteryLevel=`echo "$POWERD_OUTPUT" | awk -F: '/Battery Level/ {print substr($2, 1, length($2)-1) + 0}'`
-isCharging=`echo "$POWERD_OUTPUT" | awk -F: '/Charging/ {print substr($2,2,length($2))}'`
+batteryLevel=$(echo "$POWERD_OUTPUT" | awk -F: '/Battery Level/ {gsub(/[^0-9]/,"",$2); print $2}')
+isCharging=$(echo "$POWERD_OUTPUT" | awk -F: '/Charging/ {gsub(/^[ \t]+/,"",$2); print $2}')
 IMAGE_URI_WITH_PARAMS="$IMAGE_URI?batteryLevel=$batteryLevel&isCharging=$isCharging"
 
 # Capture wget output and exit code for detailed logging
@@ -46,37 +46,38 @@ if [ $WGET_EXIT_CODE -eq 0 ]; then
     then
         logger "Updating image on screen"
         eips -f -g $SCREENSAVERFILE
+		
+		if [ "${OSS_DEBUG:-0}" -eq 1 ]; then
+			TS="$(date '+%H:%M:%S' 2>/dev/null)"
+			[ -z "$TS" ] && TS="$(date 2>/dev/null)"
 
-        if [ "${OSS_DEBUG:-0}" -eq 1 ]; then
-            TS="$(date '+%H:%M:%S' 2>/dev/null)"
-            [ -z "$TS" ] && TS="$(date 2>/dev/null)"
+			BOX_X=2
+			BOX_Y=2
+			BOX_W=50   # inkl. Rahmen
+			BOX_H=6
 
-            BOX_X=2
-            BOX_Y=2
-            BOX_W=50   # inkl. Rahmen
-            BOX_H=5
+			# Leerzeilen innen (BOX_W-2)
+			INNER_W=$((BOX_W-2))
+			INNER_SPACES="$(printf '%*s' "$INNER_W" '')"
 
-            # Leerzeilen innen (BOX_W-2)
-            INNER_W=$((BOX_W-2))
-            INNER_SPACES="$(printf '%*s' "$INNER_W" '')"
+			# Top border
+			eips "$BOX_X" "$BOX_Y" "+$(printf '%*s' "$INNER_W" '' | tr ' ' '-')+"
 
-            # Top border
-            eips "$BOX_X" "$BOX_Y" "+$(printf '%*s' "$INNER_W" '' | tr ' ' '-')+"
+			# Middle
+			i=1
+			while [ $i -le $((BOX_H-2)) ]; do
+			eips "$BOX_X" "$((BOX_Y+i))" "|$INNER_SPACES|"
+			i=$((i+1))
+			done
 
-            # Middle
-            i=1
-            while [ $i -le $((BOX_H-2)) ]; do
-            eips "$BOX_X" "$((BOX_Y+i))" "|$INNER_SPACES|"
-            i=$((i+1))
-            done
+			# Bottom border
+			eips "$BOX_X" "$((BOX_Y+BOX_H-1))" "+$(printf '%*s' "$INNER_W" '' | tr ' ' '-')+"
 
-            # Bottom border
-            eips "$BOX_X" "$((BOX_Y+BOX_H-1))" "+$(printf '%*s' "$INNER_W" '' | tr ' ' '-')+"
-
-            # Text
-            eips "$((BOX_X+2))" "$((BOX_Y+2))" "UPDATED: $TS"
-        fi
-
+			# Text
+			eips "$((BOX_X+2))" "$((BOX_Y+2))" "UPDATED: $TS"
+			eips "$((BOX_X+2))" "$((BOX_Y+3))" "BATTERY: ${batteryLevel} percent (Charging: ${isCharging})"
+		fi	
+		
     fi
 else
     # Log detailed wget failure information
