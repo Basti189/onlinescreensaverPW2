@@ -21,6 +21,11 @@ An event-driven screensaver extension that automatically fetches images from a U
 - Automatic RTC wakeup scheduling prevents indefinite sleep
 - Works across Kindle generations with unified event-driven approach
 
+**On-Screen Debug Mode**
+- Optional on-device debug overlay using `eips`
+- Displays last update time and battery/charging state directly on the screensaver
+- Useful for testing scheduling, WiFi behavior, and RTC wakeups without SSH access
+
 ## How It Works
 
 The scheduler operates purely on power state events:
@@ -28,8 +33,17 @@ The scheduler operates purely on power state events:
 1. **`goingToScreenSaver`** - Device entering screensaver mode → performs immediate update
 2. **`wakeupFromSuspend`** - Device waking from RTC alarm → enables WiFi, waits 10s for WiFi, then updates
 3. **`readyToSuspend`** - Device about to sleep → calculates and sets RTC timer for next scheduled update
+4. **`exitingScreenSaver`** – User wakes the device (power button / touch) → restores the previous WiFi state if configured
 
 This approach ensures updates happen at the right moments while allowing the device to sleep efficiently between updates.
+
+### WiFi State Preservation
+
+If `RESTORE_WIFI_STATE=1` is enabled, the scheduler remembers the WiFi state **before** entering the screensaver and restores it **only when the user actively wakes the device** (`exitingScreenSaver` event).
+
+This ensures:
+- WiFi stays disabled during unattended background updates
+- User expectations are respected when turning the screen back on
 
 ## Use Cases
 
@@ -74,6 +88,15 @@ IMAGE_URI="http://192.168.1.100:5000"
 
 # Where to save the downloaded image
 SCREENSAVERFILE=/mnt/us/linkss/screensavers/bg_ss00.png
+```
+
+### Optional WiFi Restore
+
+```bash
+# Restore WiFi state when user wakes the device
+# 1 = restore WiFi state
+# 0 = always keep WiFi disabled after updates
+RESTORE_WIFI_STATE=1
 ```
 
 **Note:** The extension copies images to `/mnt/us/linkss/screensavers/` by default. Back up any existing screensaver images you want to preserve. For predictable results, use only one screensaver image file.
@@ -129,6 +152,20 @@ The extension coordinates carefully with Kindle's power management:
 - **Update Timing**: Scheduled updates use RTC alarms to wake the device at precise intervals
 - **Timeout Protection**: Updates complete within 20 seconds or are terminated to prevent battery drain
 - **Sleep Coordination**: Properly signals readiness to suspend, allowing normal power management
+
+## RTC Wakeup Behavior (Important)
+
+The scheduler intentionally **does NOT debounce** RTC wakeup setup.
+
+Kindle's `powerd` emits **multiple `readyToSuspend` events by design** as part of its suspend countdown. Attempting to debounce or "optimize" RTC scheduling has been tested and **breaks wakeup reliability**, causing missed alarms and stalled updates.
+
+### Design decision:
+- RTC wakeup is set on **every `readyToSuspend` event**
+- Duplicate RTC writes are safe
+- Missed RTC alarms are not
+
+⚠️ **Do not add RTC debouncing logic**  
+This was tested and confirmed to prevent the device from waking reliably.
 
 ## Troubleshooting
 
