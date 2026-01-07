@@ -56,3 +56,5 @@ TMPFILE=/tmp/tmp.onlinescreensaver.png
 
 # Whether to show debug infos on sleep (1) or not (0).
 OSS_DEBUG=1
+
+RESTORE_WIFI_STATE=1

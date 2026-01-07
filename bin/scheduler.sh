@@ -32,8 +32,42 @@ else
 	exit 1
 fi
 
-###############################################################################
+##############################################################################
 
+# Remember previous WiFi state across screensaver
+WIFI_STATE_BEFORE=""
+
+get_wifi_state() {
+    lipc-get-prop com.lab126.cmd wirelessEnable 2>/dev/null
+}
+
+set_wifi_state() {
+    # expects 0 or 1
+	logger "Change WiFi state to $1"
+    lipc-set-prop com.lab126.cmd wirelessEnable "$1"
+}
+
+remember_connectivity_state() {
+    WIFI_STATE_BEFORE="$(get_wifi_state)"
+    logger "Remembered connectivity: wifi=$WIFI_STATE_BEFORE"
+}
+
+restore_connectivity_state_if_enabled() {
+    if [ "${RESTORE_WIFI_STATE:-0}" -ne 1 ]; then
+        logger "RESTORE_WIFI_STATE disabled -> not restoring WiFi state"
+        return
+    fi
+
+    # If we never stored anything yet, do nothing
+    if [ -z "$WIFI_STATE_BEFORE" ]; then
+        logger "No stored WiFi state -> skipping restore"
+        return
+    fi
+
+    logger "Restoring connectivity: wifi=$WIFI_STATE_BEFORE"
+
+    set_wifi_state "$WIFI_STATE_BEFORE"
+}
 
 ##############################################################################
 
@@ -217,7 +251,7 @@ logger "Starting event-driven scheduler - waiting for powerd events"
 
 # Flush any leftover temp logs from previous session
 flush_temp_logs force
-lipc-wait-event -m com.lab126.powerd goingToScreenSaver,wakeupFromSuspend,readyToSuspend | while read event; do
+lipc-wait-event -m com.lab126.powerd goingToScreenSaver,wakeupFromSuspend,readyToSuspend,outOfScreenSaver | while read event; do
     logger "Received event: $event"
     
     DEVICE_STATUS=$(lipc-get-prop com.lab126.powerd status)
@@ -226,24 +260,30 @@ lipc-wait-event -m com.lab126.powerd goingToScreenSaver,wakeupFromSuspend,readyT
     case "$event" in
         goingToScreenSaver*)
             logger "Going to screensaver - performing scheduled update"
+			remember_connectivity_state
             do_update_cycle
+			set_wifi_state 0
             ;;
         wakeupFromSuspend*)
             logger "Waking from suspend - waiting 2 seconds for system, then updating"
             sleep 2
             do_update_cycle
+			set_wifi_state 0
             ;;
         readyToSuspend*)
             logger "Ready to suspend - setting RTC wakeup timer"
             NEXT_UPDATE_SECONDS=$(get_seconds_until_next_update)
             logger "Next update in $NEXT_UPDATE_SECONDS seconds"
             set_rtc_wakeup_relative $NEXT_UPDATE_SECONDS
+			set_wifi_state 0
             ;;
+		outOfScreenSaver*)
+			restore_connectivity_state_if_enabled
+			;;
         *)
             logger "Unknown event: $event"
             ;;
     esac
     
-    logger "Ensuring WiFi is turned off..."
-    lipc-set-prop com.lab126.cmd wirelessEnable 0
+
 done
