@@ -16,7 +16,7 @@ else
 	exit
 fi
 
-if [ -e /etc/upstart ]; then
+if [ -d /etc/upstart ]; then
 	logger "Enabling online screensaver auto-update"
 
 	mntroot rw

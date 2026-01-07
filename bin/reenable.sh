@@ -16,10 +16,24 @@ else
 	exit
 fi
 
-logger "Disabling online screensaver auto-update"
+logger "Re-enabling online screensaver auto-update"
 
 stop onlinescreensaver || true      
 
 mntroot rw
 rm /etc/upstart/onlinescreensaver.conf
 mntroot ro
+
+sleep 2
+
+if [ -d /etc/upstart ]; then
+	logger "Enabling online screensaver auto-update"
+
+	mntroot rw
+	cp onlinescreensaver.conf /etc/upstart/
+	mntroot ro
+
+	start onlinescreensaver
+else
+	logger "Upstart folder not found, device too old"
+fi

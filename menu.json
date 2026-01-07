@@ -9,13 +9,24 @@
           "name": "Enable auto-download",
           "priority": 0,
           "action": "bin/enable.sh",
-          "if": "\"/etc/upstart/onlinescreensaver.conf\" -f !"
+          "if": "\"/etc/upstart/onlinescreensaver.conf\" -f !",
+          "refresh": true,
+          "exitmenu":false
         },
         {
           "name": "Disable auto-download",
           "priority": 0,
           "action": "bin/disable.sh",
-          "if": "\"/etc/upstart/onlinescreensaver.conf\" -f"
+          "if": "\"/etc/upstart/onlinescreensaver.conf\" -f",
+          "refresh": true,
+          "exitmenu":false
+        },
+        {
+          "name": "Re-enable auto-download",
+          "priority": 0,
+          "action": "bin/reenable.sh",
+          "if": "\"/etc/upstart/onlinescreensaver.conf\" -f",
+          "exitmenu":false
         }
       ]
     }
