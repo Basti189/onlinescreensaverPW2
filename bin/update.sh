@@ -46,6 +46,37 @@ if [ $WGET_EXIT_CODE -eq 0 ]; then
     then
         logger "Updating image on screen"
         eips -f -g $SCREENSAVERFILE
+
+        if [ "${OSS_DEBUG:-0}" -eq 1 ]; then
+            TS="$(date '+%H:%M:%S' 2>/dev/null)"
+            [ -z "$TS" ] && TS="$(date 2>/dev/null)"
+
+            BOX_X=2
+            BOX_Y=2
+            BOX_W=50   # inkl. Rahmen
+            BOX_H=5
+
+            # Leerzeilen innen (BOX_W-2)
+            INNER_W=$((BOX_W-2))
+            INNER_SPACES="$(printf '%*s' "$INNER_W" '')"
+
+            # Top border
+            eips "$BOX_X" "$BOX_Y" "+$(printf '%*s' "$INNER_W" '' | tr ' ' '-')+"
+
+            # Middle
+            i=1
+            while [ $i -le $((BOX_H-2)) ]; do
+            eips "$BOX_X" "$((BOX_Y+i))" "|$INNER_SPACES|"
+            i=$((i+1))
+            done
+
+            # Bottom border
+            eips "$BOX_X" "$((BOX_Y+BOX_H-1))" "+$(printf '%*s' "$INNER_W" '' | tr ' ' '-')+"
+
+            # Text
+            eips "$((BOX_X+2))" "$((BOX_Y+2))" "UPDATED: $TS"
+        fi
+
     fi
 else
     # Log detailed wget failure information

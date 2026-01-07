@@ -53,3 +53,6 @@ LOGFILE=/mnt/us/extensions/onlinescreensaver/log/onlinescreensaver.log
 
 # the temporary file to download the screensaver image to
 TMPFILE=/tmp/tmp.onlinescreensaver.png
+
+# Whether to show debug infos on sleep (1) or not (0).
+OSS_DEBUG=1
